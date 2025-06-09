@@ -1,0 +1,30 @@
+name: E2E Tests
+on: [push,pull_request]
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres: { image: postgres:15, ports: ['5432:5432'], ... }
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@v3
+        with: { repository: 'nnnnnnnnic0/app-Depor', path: 'backend' }
+      - name: Start backend
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          uvicorn app.main:app --port 8000 &
+          npx wait-on http://localhost:8000/docs
+      - name: Checkout frontend
+        uses: actions/checkout@v3
+        with: { repository: 'nnnnnnnnic0/app-Depor-frontend', path: 'frontend' }
+      - name: Start frontend
+        run: |
+          cd frontend
+          npm ci
+          npm start &
+          npx wait-on http://localhost:5173
+      - name: Run Cypress
+        run: |
+          cd frontend
+          npx cypress run
