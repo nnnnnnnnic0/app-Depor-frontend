@@ -1,30 +1,61 @@
 name: E2E Tests
-on: [push,pull_request]
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
 jobs:
   e2e:
     runs-on: ubuntu-latest
+
     services:
-      postgres: { image: postgres:15, ports: ['5432:5432'], ... }
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        ports:
+          - '5432:5432'
+        options: >-
+          --health-cmd="pg_isready -U test -d test_db"
+          --health-interval=10s
+          --health-retries=5
+
     steps:
       - name: Checkout backend
         uses: actions/checkout@v3
-        with: { repository: 'nnnnnnnnic0/app-Depor', path: 'backend' }
+        with:
+          repository: nnnnnnnnic0/app-Depor
+          path: backend
+
       - name: Start backend
+        working-directory: backend
         run: |
-          cd backend
+          python -m venv venv
+          source venv/bin/activate
           pip install -r requirements.txt
-          uvicorn app.main:app --port 8000 &
-          npx wait-on http://localhost:8000/docs
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+
+      - name: Wait for backend
+        run: npx wait-on http://localhost:8000/docs
+
       - name: Checkout frontend
         uses: actions/checkout@v3
-        with: { repository: 'nnnnnnnnic0/app-Depor-frontend', path: 'frontend' }
+        with:
+          repository: nnnnnnnnic0/app-Depor-frontend
+          path: frontend
+
       - name: Start frontend
+        working-directory: frontend
         run: |
-          cd frontend
           npm ci
           npm start &
-          npx wait-on http://localhost:5173
-      - name: Run Cypress
-        run: |
-          cd frontend
-          npx cypress run
+
+      - name: Wait for frontend
+        run: npx wait-on http://localhost:5173
+
+      - name: Run Cypress E2E
+        working-directory: frontend
+        run: npx cypress run
